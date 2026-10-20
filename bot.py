@@ -1,6 +1,8 @@
 import logging
 import os
 import pandas as pd
+from flask import Flask
+from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
@@ -9,6 +11,17 @@ ADMIN_IDS = [123456789]
 CSV_FILE = "licences.csv"
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+# Flask ሰርቨር ለ Render ፖርት ክፍት እንዲሆን
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "Silte Transport Bot is running!"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app_flask.run(host="0.0.0.0", port=port)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = (
@@ -31,13 +44,10 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if os.path.exists(CSV_FILE):
         df = pd.read_csv(CSV_FILE)
-        
-        # ዓምዶቹን ወደ ስትሪንግ እና ወደ ትንሽ ፊደል መቀየር
         df['licence_no'] = df['licence_no'].astype(str).str.lower()
         df['phone'] = df['phone'].astype(str).str.lower()
         df['name_lower'] = df['name'].astype(str).str.lower()
         
-        # በላይሰንስ ቁጥር፣ በስልክ ቁጥር ወይም በስም መፈለግ
         result = df[
             (df['licence_no'] == user_input) | 
             (df['phone'] == user_input) | 
@@ -78,6 +88,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text=text, parse_mode='Markdown')
 
 def main():
+    # Flask ሰርቨርን በሌላ ስሬድ (Thread) ማስጀመር
+    t = Thread(target=run_flask)
+    t.start()
+
+    # የቴሌግራም ቦት ማስተካከል
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
