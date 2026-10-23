@@ -9,7 +9,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 
 BOT_TOKEN = "8401109482:AAH90n3Y8iT1NBmI9hoBbBOyHWySDUzoH00"  # የቦት ቶከንዎ
 ADMIN_IDS = [123456789]  # የራስዎን የቴሌግራም ID እዚህ ያስገቡ
-CHANNEL_USERNAME = "@https://t.me/SilteiZoneTransportRoad14"  # የቴሌግራም ቻናልዎ ዩዘርናም
+CHANNEL_USERNAME = "@https://t.me/SilteiZoneTransportRoad14"  # የቴሌግራም ቻናልዎ ዩዘርናም (በ @ ይጻፉ)
 
 EXCEL_FILE = "licences.xlsx"
 WORD_FILE = "licences.docx"
@@ -27,11 +27,10 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
 
-# 🟢 ሁለቱንም ፋይሎች (Excel እና Word) አንብቦ በአንድ ላይ የሚያቀላቅል ፊንክሽን
+# ሁለቱንም ፋይሎች (Excel እና Word) አንብቦ በአንድ ላይ የሚያቀላቅል ፊንክሽን
 def load_all_data():
     all_dfs = []
     
-    # 1. ኤክሰል ፋይል ካለ ማንበብ
     if os.path.exists(EXCEL_FILE):
         try:
             df_excel = pd.read_excel(EXCEL_FILE, dtype=str)
@@ -39,18 +38,15 @@ def load_all_data():
         except Exception as e:
             logging.error(f"Excel reading error: {e}")
             
-    # 2. ዎርድ ፋይል ካለ እና ውስጥ ሰንጠረዥ (Table) ካለ ማንበብ
     if os.path.exists(WORD_FILE):
         try:
             doc = Document(WORD_FILE)
             word_data = []
             for table in doc.tables:
-                headers = [cell.text.strip() for cell in table.rows[0].cells]
                 for row in table.rows[1:]:
                     row_data = [cell.text.strip() for cell in row.cells]
                     word_data.append(row_data)
             if word_data:
-                # ዎርድ ውስጥ ያሉት ሰንጠረዦች አምዶች ከኤክሰል ጋር ተመሳሳይ መሆን አለባቸው
                 df_word = pd.DataFrame(word_data, columns=['licence_no', 'name', 'phone', 'category', 'round', 'status'])
                 all_dfs.append(df_word)
         except Exception as e:
@@ -71,10 +67,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*(የፈቃድዎ ሁኔታ፣ የደረጃ ዓይነት እና የመጣበት ዙር በዝርዝር ይነገርዎታል)*"
     )
     
-    bot_username = "Siltetransportlicencebot"
+    bot_username = "Siltetransportlicencebot"  # የቦትዎ ዩዘርናም
+    channel_link = f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"
 
     if update.effective_user.id in ADMIN_IDS:
         keyboard = [
+            # 🟢 የቻናሉ ሊንክ ከላይ እንዲሆን ተደርጓል
+            [InlineKeyboardButton("📢 ቻናላችንን ጆይን ለማድረግ (Join)", url=channel_link)],
             [InlineKeyboardButton("➕ Add me to your group", url=f"https://t.me/{bot_username}?startgroup=true")],
             [InlineKeyboardButton("↗️ Add me to your channel", url=f"https://t.me/{bot_username}?startchannel=true")],
             [InlineKeyboardButton("📊 አጠቃላይ መረጃዎችን ለማየት", callback_data="admin_stats")],
@@ -84,6 +83,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode='Markdown')
     else:
         keyboard = [
+            # 🟢 የቻናሉ ሊንክ ከላይ እንዲሆን ተደርጓል
+            [InlineKeyboardButton("📢 ቻናላችንን ጆይን ለማድረግ (Join)", url=channel_link)],
             [InlineKeyboardButton("➕ Add me to your group", url=f"https://t.me/{bot_username}?startgroup=true")],
             [InlineKeyboardButton("↗️ Add me to your channel", url=f"https://t.me/{bot_username}?startchannel=true")]
         ]
@@ -114,7 +115,7 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response += (
                     f"📌 **ተራ ቁጥር (በሰንጠረዥ):** {row_number}\n"
                     f"👤 **ስም:** {data['name']}\n"
-                    f"የመንጃ ፍቃድ ቁጥር: `{data['licence_no']}`\n"
+                    f"የመንጃ ፈቃድ ቁጥር: `{data['licence_no']}`\n"
                     f"📞 **ስልክ ቁጥር:** {data['phone']}\n"
                     f"🚗 **የመንጃ ፈቃድ ደረጃ:** {data['category']}\n"
                     f"🔢 **የመጣበት ዙር:** {data['round']}\n"
