@@ -31,7 +31,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "1️⃣ **የመንጃ ፈቃድ ቁጥር** (ምሳሌ፦ 10-00001 ወይም 12345)\n"
         "2️⃣ **ስልክ ቁጥር** (ምሳሌ፦ 0911121314)\n"
         "3️⃣ **ሙሉ ስም** (ምሳሌ፦ አህመድ ሀሰን)\n\n"
-        "*(የፈቃድዎ ሁኔታ፣ የደረጃ ዓይነት እና የወጣበት ዙር በዝርዝር ይነገርዎታል)*"
+        "*(የፈቃድዎ ሁኔታ፣ የደረጃ ዓይነት እና የመጣበት ዙር በዝርዝር ይነገርዎታል)*"
     )
     if update.effective_user.id in ADMIN_IDS:
         keyboard = [
@@ -61,12 +61,14 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not result.empty:
             response = "✅ **የተገኙ የመንጃ ፈቃድ መረጃዎች:**\n\n"
             for index, data in result.iterrows():
+                row_number = index + 1  # በሰንጠረዡ ላይ የሚገኝበት ትክክለኛ ተራ ቁጥር
                 response += (
+                    f"📌 **ተራ ቁጥር (በሰንጠረዥ):** {row_number}\n"
                     f"👤 **ስም:** {data['name']}\n"
                     f"ሹፌር/የፈቃድ ቁጥር: `{data['licence_no']}`\n"
                     f"📞 **ስልክ ቁጥር:** {data['phone']}\n"
                     f"🚗 **የመንጃ ፈቃድ ደረጃ:** {data['category']}\n"
-                    f"🔢 **የወጣበት ዙር:** {data['round']}\n"
+                    f"🔢 **የመጣበት ዙር:** {data['round']}\n"
                     f"📌 **ሁኔታ:** {data['status']}\n\n"
                     f"------------------------\n"
                 )
