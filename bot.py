@@ -16,7 +16,6 @@ WORD_FILE = "licences.docx"
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# Flask ሰርቨር ለ Render ፖርት ክፍት እንዲሆን
 app_flask = Flask(__name__)
 
 @app_flask.route('/')
@@ -27,7 +26,6 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
 
-# ሁለቱንም ፋይሎች (Excel እና Word) አንብቦ በአንድ ላይ የሚያቀላቅል ፊንክሽን
 def load_all_data():
     all_dfs = []
     
@@ -67,29 +65,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*(የፈቃድዎ ሁኔታ፣ የደረጃ ዓይነት እና የመጣበት ዙር በዝርዝር ይነገርዎታል)*"
     )
     
-    bot_username = "Siltetransportlicencebot"  # የቦትዎ ዩዘርናም
     channel_link = f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"
 
+    # 🟢 ቻናሉን ጆይን የሚያደርገው አዝራር ከላይ እንዲሆን ተደርጓል
+    keyboard = [
+        [InlineKeyboardButton("📢 ቻናላችንን ጆይን ለማድረግ (Join)", url=channel_link)]
+    ]
+    
     if update.effective_user.id in ADMIN_IDS:
-        keyboard = [
-            # 🟢 የቻናሉ ሊንክ ከላይ እንዲሆን ተደርጓል
-            [InlineKeyboardButton("📢 ቻናላችንን ጆይን ለማድረግ (Join)", url=channel_link)],
-            [InlineKeyboardButton("➕ Add me to your group", url=f"https://t.me/{bot_username}?startgroup=true")],
-            [InlineKeyboardButton("↗️ Add me to your channel", url=f"https://t.me/{bot_username}?startchannel=true")],
-            [InlineKeyboardButton("📊 አጠቃላይ መረጃዎችን ለማየት", callback_data="admin_stats")],
-            [InlineKeyboardButton("📢 አዲሱን ዙር ወደ ቻናል ለመልቀቅ", callback_data="send_to_channel")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode='Markdown')
-    else:
-        keyboard = [
-            # 🟢 የቻናሉ ሊንክ ከላይ እንዲሆን ተደርጓል
-            [InlineKeyboardButton("📢 ቻናላችንን ጆይን ለማድረግ (Join)", url=channel_link)],
-            [InlineKeyboardButton("➕ Add me to your group", url=f"https://t.me/{bot_username}?startgroup=true")],
-            [InlineKeyboardButton("↗️ Add me to your channel", url=f"https://t.me/{bot_username}?startchannel=true")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode='Markdown')
+        keyboard.append([InlineKeyboardButton("📊 አጠቃላይ መረጃዎችን ለማየት", callback_data="admin_stats")])
+        keyboard.append([InlineKeyboardButton("📢 አዲሱን ዙር ወደ ቻናል ለመልቀቅ", callback_data="send_to_channel")])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text.strip().lower()
@@ -101,6 +89,7 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
         df['phone'] = df['phone'].fillna('').astype(str).str.strip().str.lower()
         df['name'] = df['name'].fillna('').astype(str).str.strip()
         df['name_lower'] = df['name'].str.lower()
+        df['status_lower'] = df['status'].fillna('').astype(str).str.strip().str.lower()
         
         result = df[
             (df['licence_no'] == user_input) | 
@@ -109,26 +98,37 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         
         if not result.empty:
-            response = "✅ **የተገኙ የመንጃ ፈቃድ መረጃዎች:**\n\n"
+            response = ""
             for index, data in result.iterrows():
                 row_number = index + 1
-                response += (
-                    f"📌 **ተራ ቁጥር (በሰንጠረዥ):** {row_number}\n"
-                    f"👤 **ስም:** {data['name']}\n"
-                    f"የመንጃ ፈቃድ ቁጥር: `{data['licence_no']}`\n"
-                    f"📞 **ስልክ ቁጥር:** {data['phone']}\n"
-                    f"🚗 **የመንጃ ፈቃድ ደረጃ:** {data['category']}\n"
-                    f"🔢 **የመጣበት ዙር:** {data['round']}\n"
-                    f"📌 **ሁኔታ:** {data['status']}\n\n"
-                    f"------------------------\n"
-                )
-            response += "ℹ️ እባክዎ አስፈላጊ መረጃዎችን በመያዝ በመምሪያችን በአካል ቀርበው ይውሰዱ።"
+                status_text = data['status'].strip() if pd.notna(data['status']) else ""
+                status_lower = status_text.lower()
+                
+                # ስታተስ ላይ "ምርመራ" ወይም "ሪማርክ" ካለ
+                if "ምርመራ" in status_lower or "ሪማርክ" in status_lower:
+                    response += (
+                        f"❌ **የመንጃ ፈቃድዎ አልመጣም!**\n\n"
+                        f"👤 **ስም:** {data['name']}\n"
+                        f"🔢 **የመንጃ ፈቃድ ቁጥር:** `{data['licence_no']}`\n"
+                        f"🔴 **ሁኔታ:** 🛑 ቀይ ተደርጓል (አልመጣም)\n"
+                        f"📝 **ምክንያት/ሪማርክ:** {status_text}\n\n"
+                        f"ℹ️ እባክዎ ተጨማሪ መረጃ ለማግኘት በአካል ቀርበው ያመልክቱ።\n"
+                        f"------------------------\n"
+                    )
+                else:
+                    # ምንም ካልተጻፈ (ባዶ ከሆነ) መንጃ ፈቃዱ እንደመጣ ያሳያል
+                    response += (
+                        f"✅ **የመንጃ ፈቃድዎ መጥቷል!**\n\n"
+                        f"📌 **ተራ ቁጥር:** {row_number}\n"
+                        f"👤 **ስም:** {data['name']}\n"
+                        f"🔢 **የመንጃ ፈቃድ ቁጥር:** `{data['licence_no']}`\n"
+                        f"🔄 **የመጣበት ዙር:** {data['round']}\n"
+                        f"🚗 **የመንጃ ፈቃድ ደረጃ:** {data['category']}\n\n"
+                        f"ℹ️ እባክዎ አስፈላጊ መረጃዎችን በመያዝ በመምሪያችን በአካል ቀርበው ይውሰዱ።\n"
+                        f"------------------------\n"
+                    )
         else:
-            response = (
-                f"❌ **መረጃው አልተገኘም!**\n\n"
-                f" '{user_input}' የሚል መረጃ በመጡት ዝርዝር ውስጥ አልተገኘም።\n\n"
-                f"እባክዎ መረጃውን በትክክል ማስገባትዎን ያረጋግጡ።"
-            )
+            response = "እባክዎ የመንጃ ፈቃድዎ አልመጣም፤ ካስገቡ ከቆየ በአካል ቀርበው ያመልክቱ።"
     else:
         response = "የመረጃ ቋቱ በአሁኑ ሰዓት ዝግጁ አይደለም። እባክዎ ትንሽ ቆይተው ይሞክሩ።"
         
