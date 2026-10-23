@@ -1,15 +1,18 @@
 import logging
 import os
 import pandas as pd
+from docx import Document
 from flask import Flask
 from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-BOT_TOKEN = "8401109482:AAH90n3Y8iT1NBmI9hoBbBOyHWySDUzoH00"
-ADMIN_IDS = [123456789]  # <-- የራስዎን የቴሌግራም ID እዚህ ያስገቡ
-CHANNEL_USERNAME = "@https://t.me/SilteiZoneTransportRoad14"  # <-- የቴሌግራም ቻናልዎ ዩዘርናም
-EXCEL_FILE = "licences.xlsx"  # <-- የኤክሰል ፋይልዎ ስም
+BOT_TOKEN = "8401109482:AAH90n3Y8iT1NBmI9hoBbBOyHWySDUzoH00"  # የቦት ቶከንዎ
+ADMIN_IDS = [123456789]  # የራስዎን የቴሌግራም ID እዚህ ያስገቡ
+CHANNEL_USERNAME = "@https://t.me/SilteiZoneTransportRoad14"  # የቴሌግራም ቻናልዎ ዩዘርናም
+
+EXCEL_FILE = "licences.xlsx"
+WORD_FILE = "licences.docx"
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -24,33 +27,79 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
 
+# 🟢 ሁለቱንም ፋይሎች (Excel እና Word) አንብቦ በአንድ ላይ የሚያቀላቅል ፊንክሽን
+def load_all_data():
+    all_dfs = []
+    
+    # 1. ኤክሰል ፋይል ካለ ማንበብ
+    if os.path.exists(EXCEL_FILE):
+        try:
+            df_excel = pd.read_excel(EXCEL_FILE, dtype=str)
+            all_dfs.append(df_excel)
+        except Exception as e:
+            logging.error(f"Excel reading error: {e}")
+            
+    # 2. ዎርድ ፋይል ካለ እና ውስጥ ሰንጠረዥ (Table) ካለ ማንበብ
+    if os.path.exists(WORD_FILE):
+        try:
+            doc = Document(WORD_FILE)
+            word_data = []
+            for table in doc.tables:
+                headers = [cell.text.strip() for cell in table.rows[0].cells]
+                for row in table.rows[1:]:
+                    row_data = [cell.text.strip() for cell in row.cells]
+                    word_data.append(row_data)
+            if word_data:
+                # ዎርድ ውስጥ ያሉት ሰንጠረዦች አምዶች ከኤክሰል ጋር ተመሳሳይ መሆን አለባቸው
+                df_word = pd.DataFrame(word_data, columns=['licence_no', 'name', 'phone', 'category', 'round', 'status'])
+                all_dfs.append(df_word)
+        except Exception as e:
+            logging.error(f"Word reading error: {e}")
+            
+    if all_dfs:
+        combined_df = pd.concat(all_dfs, ignore_index=True)
+        return combined_df
+    return pd.DataFrame()
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = (
         "እንኳን ወደ የስልጤ ዞን ትራንስፖርትና መንገድ ልማት መምሪያ የመንጃ ፈቃድ ማሳወቂያ ቦት በደህና መጡ! 🚘\n\n"
         "የመንጃ ፈቃድዎ መምጣቱን ለማረጋገጥ ከሚከተሉት **አንድ መረጃ** ብቻ በመምረጥ ይጻፉልን፦\n"
-        "1️⃣ **የመንጃ ፈቃድ ቁጥር** (ምሳሌ፦ 10-00001 ወይም 12345)\n"
-        "2️⃣ **ስልክ ቁጥር** (ምሳሌ፦ 0911121314)\n"
-        "3️⃣ **ሙሉ ስም** (ምሳሌ፦ አህመድ ሀሰን)\n\n"
+        "1️⃣ **የመንጃ ፈቃድ ቁጥር**\n"
+        "2️⃣ **ስልክ ቁጥር**\n"
+        "3️⃣ **ሙሉ ስም**\n\n"
         "*(የፈቃድዎ ሁኔታ፣ የደረጃ ዓይነት እና የመጣበት ዙር በዝርዝር ይነገርዎታል)*"
     )
+    
+    bot_username = "Siltetransportlicencebot"
+
     if update.effective_user.id in ADMIN_IDS:
         keyboard = [
+            [InlineKeyboardButton("➕ Add me to your group", url=f"https://t.me/{bot_username}?startgroup=true")],
+            [InlineKeyboardButton("↗️ Add me to your channel", url=f"https://t.me/{bot_username}?startchannel=true")],
             [InlineKeyboardButton("📊 አጠቃላይ መረጃዎችን ለማየት", callback_data="admin_stats")],
             [InlineKeyboardButton("📢 አዲሱን ዙር ወደ ቻናል ለመልቀቅ", callback_data="send_to_channel")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode='Markdown')
     else:
-        await update.message.reply_text(welcome_message, parse_mode='Markdown')
+        keyboard = [
+            [InlineKeyboardButton("➕ Add me to your group", url=f"https://t.me/{bot_username}?startgroup=true")],
+            [InlineKeyboardButton("↗️ Add me to your channel", url=f"https://t.me/{bot_username}?startchannel=true")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text.strip().lower()
     
-    if os.path.exists(EXCEL_FILE):
-        df = pd.read_excel(EXCEL_FILE)  # ኤክሰል ፋይልን ማንበቢያ
-        df['licence_no'] = df['licence_no'].astype(str).str.lower()
-        df['phone'] = df['phone'].astype(str).str.lower()
-        df['name_lower'] = df['name'].astype(str).str.lower()
+    df = load_all_data()
+    
+    if not df.empty:
+        df['licence_no'] = df['licence_no'].fillna('').astype(str).str.strip().str.lower()
+        df['phone'] = df['phone'].fillna('').astype(str).str.strip().str.lower()
+        df['name'] = df['name'].fillna('').astype(str).str.strip()
+        df['name_lower'] = df['name'].str.lower()
         
         result = df[
             (df['licence_no'] == user_input) | 
@@ -65,7 +114,7 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 response += (
                     f"📌 **ተራ ቁጥር (በሰንጠረዥ):** {row_number}\n"
                     f"👤 **ስም:** {data['name']}\n"
-                    f"ሹፌር/የፈቃድ ቁጥር: `{data['licence_no']}`\n"
+                    f"የመንጃ ፍቃድ ቁጥር: `{data['licence_no']}`\n"
                     f"📞 **ስልክ ቁጥር:** {data['phone']}\n"
                     f"🚗 **የመንጃ ፈቃድ ደረጃ:** {data['category']}\n"
                     f"🔢 **የመጣበት ዙር:** {data['round']}\n"
@@ -76,7 +125,7 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             response = (
                 f"❌ **መረጃው አልተገኘም!**\n\n"
-                f" '{user_input}' የሚል መረጃ በወጡት ዝርዝር ውስጥ አልተገኘም።\n\n"
+                f" '{user_input}' የሚል መረጃ በመጡት ዝርዝር ውስጥ አልተገኘም።\n\n"
                 f"እባክዎ መረጃውን በትክክል ማስገባትዎን ያረጋግጡ።"
             )
     else:
@@ -92,18 +141,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text="❌ ይህንን ትእዛዝ ለመፈጸም ፈቃድ አልዎትም!")
         return
 
-    if query.data == "admin_stats" and os.path.exists(EXCEL_FILE):
-        df = pd.read_excel(EXCEL_FILE)
+    df = load_all_data()
+    if query.data == "admin_stats" and not df.empty:
         total_count = len(df)
         text = f"📊 **የአስተዳዳሪ ዳሽቦርድ**\n\n• በዳታቤዝ ውስጥ ያሉ ጠቅላላ የመንጃ ፈቃዶች ብዛት: **{total_count}**"
         await query.edit_message_text(text=text, parse_mode='Markdown')
         
-    elif query.data == "send_to_channel" and os.path.exists(EXCEL_FILE):
-        df = pd.read_excel(EXCEL_FILE)
-        if df.empty:
-            await query.edit_message_text(text="❌ ዳታቤዙ ባዶ ነው!")
-            return
-            
+    elif query.data == "send_to_channel" and not df.empty:
         latest_round = df['round'].iloc[-1]
         latest_data = df[df['round'] == latest_round]
         
