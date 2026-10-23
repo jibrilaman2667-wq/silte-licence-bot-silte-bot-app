@@ -8,8 +8,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 
 BOT_TOKEN = "8401109482:AAH90n3Y8iT1NBmI9hoBbBOyHWySDUzoH00"
 ADMIN_IDS = [123456789]  # <-- የራስዎን የቴሌግራም ID እዚህ ያስገቡ
-CHANNEL_USERNAME = "@https://t.me/SilteiZoneTransportRoad14"  # <-- የቴሌግራም ቻናልዎ ዩዘርናም (ምሳሌ: @Siltetransport)
-CSV_FILE = "licences.csv"
+CHANNEL_USERNAME = "@https://t.me/SilteiZoneTransportRoad14"  # <-- የቴሌግራም ቻናልዎ ዩዘርናም
+EXCEL_FILE = "licences.xlsx"  # <-- የኤክሰል ፋይልዎ ስም
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
@@ -46,8 +46,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text.strip().lower()
     
-    if os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE)
+    if os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE)  # ኤክሰል ፋይልን ማንበቢያ
         df['licence_no'] = df['licence_no'].astype(str).str.lower()
         df['phone'] = df['phone'].astype(str).str.lower()
         df['name_lower'] = df['name'].astype(str).str.lower()
@@ -61,7 +61,7 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not result.empty:
             response = "✅ **የተገኙ የመንጃ ፈቃድ መረጃዎች:**\n\n"
             for index, data in result.iterrows():
-                row_number = index + 1  # በሰንጠረዡ ላይ የሚገኝበት ትክክለኛ ተራ ቁጥር
+                row_number = index + 1
                 response += (
                     f"📌 **ተራ ቁጥር (በሰንጠረዥ):** {row_number}\n"
                     f"👤 **ስም:** {data['name']}\n"
@@ -77,7 +77,7 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = (
                 f"❌ **መረጃው አልተገኘም!**\n\n"
                 f" '{user_input}' የሚል መረጃ በወጡት ዝርዝር ውስጥ አልተገኘም።\n\n"
-                f"እባክዎ መረጃውን በትክክል ማስገባትዎን ያረጋግጡ (የፈቃድ ቁጥር፣ ስልክ ቁጥር ወይም ሙሉ ስም በመጠቀም መፈለግ ይችላሉ)።"
+                f"እባክዎ መረጃውን በትክክል ማስገባትዎን ያረጋግጡ።"
             )
     else:
         response = "የመረጃ ቋቱ በአሁኑ ሰዓት ዝግጁ አይደለም። እባክዎ ትንሽ ቆይተው ይሞክሩ።"
@@ -92,14 +92,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text="❌ ይህንን ትእዛዝ ለመፈጸም ፈቃድ አልዎትም!")
         return
 
-    if query.data == "admin_stats" and os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE)
+    if query.data == "admin_stats" and os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE)
         total_count = len(df)
         text = f"📊 **የአስተዳዳሪ ዳሽቦርድ**\n\n• በዳታቤዝ ውስጥ ያሉ ጠቅላላ የመንጃ ፈቃዶች ብዛት: **{total_count}**"
         await query.edit_message_text(text=text, parse_mode='Markdown')
         
-    elif query.data == "send_to_channel" and os.path.exists(CSV_FILE):
-        df = pd.read_csv(CSV_FILE)
+    elif query.data == "send_to_channel" and os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE)
         if df.empty:
             await query.edit_message_text(text="❌ ዳታቤዙ ባዶ ነው!")
             return
@@ -117,7 +117,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=CHANNEL_USERNAME, text=channel_message, parse_mode='Markdown')
             await query.edit_message_text(text="✅ ማስታወሻው ወደ ቴሌግራም ቻናልዎ በተሳካ ሁኔታ ተልኳል!")
         except Exception as e:
-            await query.edit_message_text(text=f"❌ መላክ አልተቻለም። ቦቱ አድሚን መሆኑን እና ዩዘርናሙ ትክክል መሆኑን ያረጋግጡ።\nስህተት: {e}")
+            await query.edit_message_text(text=f"❌ መላክ አልተቻለም። ስህተት: {e}")
 
 def main():
     t = Thread(target=run_flask)
