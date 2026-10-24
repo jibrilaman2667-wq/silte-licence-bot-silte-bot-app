@@ -7,9 +7,9 @@ from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-BOT_TOKEN = "8401109482:AAH90n3Y8iT1NBmI9hoBbBOyHWySDUzoH00"  # የቦት ቶከንዎ
-ADMIN_IDS = [123456789]  # የራስዎን የቴሌግራም ID እዚህ ያስገቡ
-CHANNEL_USERNAME = "@https://t.me/SilteiZoneTransportRoad14"  # የቴሌግራም ቻናልዎ ዩዘርናም (በ @ ይጻፉ)
+BOT_TOKEN = "8401109482:AAH90n3Y8iT1NBmI9hoBbB0YHWySDUzOH00"  # የቦት ቶከንዎ
+ADMIN_IDS = [-1001784521352]  # የራስዎን የቴሌግራም ID እዚህ ያስገቡ
+CHANNEL_USERNAME = "@SilteiZoneTransportRoad14"  # የቴሌግራም ቻናልዎ ዩዘርናም (በ @ ይጻፉ)
 
 EXCEL_FILE = "licences.xlsx"
 WORD_FILE = "licences.docx"
