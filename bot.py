@@ -32,6 +32,32 @@ def load_all_data():
     if os.path.exists(EXCEL_FILE):
         try:
             df_excel = pd.read_excel(EXCEL_FILE, dtype=str)
+            
+            # ዓምዶቹን በቁጥር (Index) በመውሰድ ስህተትን በቋሚነት ማስወገድ
+            # የኤክሰሉ ቅደም ተከተል: 1=licence_no, 2=name, 3=phone, 4=category, 5=round
+            cols = df_excel.columns.tolist()
+            new_columns = ['id', 'licence_no', 'name', 'phone', 'category', 'round']
+            
+            # ካሉት ዓምዶች ብዛት ጋር በማስተካከል መሰየም
+            rename_dict = {}
+            for i, col in enumerate(cols):
+                if i == 1:
+                    rename_dict[col] = 'licence_no'
+                elif i == 2:
+                    rename_dict[col] = 'name'
+                elif i == 3:
+                    rename_dict[col] = 'phone'
+                elif i == 4:
+                    rename_dict[col] = 'category'
+                elif i == 5:
+                    rename_dict[col] = 'round'
+                    
+            df_excel = df_excel.rename(columns=rename_dict)
+            
+            # ስታተስ ዓምድ ከሌለ ባዶ መፍጠር
+            if 'status' not in df_excel.columns:
+                df_excel['status'] = ''
+                
             all_dfs.append(df_excel)
         except Exception as e:
             logging.error(f"Excel reading error: {e}")
@@ -67,7 +93,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     channel_link = f"https://t.me/{CHANNEL_USERNAME.replace('@', '')}"
 
-    # 🟢 ቻናሉን ጆይን የሚያደርገው አዝራር ከላይ እንዲሆን ተደርጓል
     keyboard = [
         [InlineKeyboardButton("📢 ቻናላችንን ጆይን ለማድረግ (Join)", url=channel_link)]
     ]
@@ -85,6 +110,11 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
     df = load_all_data()
     
     if not df.empty:
+        # አስፈላጊ ዓምዶች መኖራቸውን ማረጋገጥ
+        for col in ['licence_no', 'phone', 'name', 'status']:
+            if col not in df.columns:
+                df[col] = ''
+                
         df['licence_no'] = df['licence_no'].fillna('').astype(str).str.strip().str.lower()
         df['phone'] = df['phone'].fillna('').astype(str).str.strip().str.lower()
         df['name'] = df['name'].fillna('').astype(str).str.strip()
@@ -104,7 +134,6 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 status_text = data['status'].strip() if pd.notna(data['status']) else ""
                 status_lower = status_text.lower()
                 
-                # ስታተስ ላይ "ምርመራ" ወይም "ሪማርክ" ካለ
                 if "ምርመራ" in status_lower or "ሪማርክ" in status_lower:
                     response += (
                         f"❌ **የመንጃ ፈቃድዎ አልመጣም!**\n\n"
@@ -116,14 +145,16 @@ async def check_licence(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"------------------------\n"
                     )
                 else:
-                    # ምንም ካልተጻፈ (ባዶ ከሆነ) መንጃ ፈቃዱ እንደመጣ ያሳያል
+                    category_val = data['category'] if pd.notna(data['category']) and str(data['category']).strip() != 'nan' else "ተገልጿል"
+                    round_val = data['round'] if pd.notna(data['round']) else "1ኛ"
+                    
                     response += (
                         f"✅ **የመንጃ ፈቃድዎ መጥቷል!**\n\n"
                         f"📌 **ተራ ቁጥር:** {row_number}\n"
                         f"👤 **ስም:** {data['name']}\n"
                         f"🔢 **የመንጃ ፈቃድ ቁጥር:** `{data['licence_no']}`\n"
-                        f"🔄 **የመጣበት ዙር:** {data['round']}\n"
-                        f"🚗 **የመንጃ ፈቃድ ደረጃ:** {data['category']}\n\n"
+                        f"🔄 **የመጣበት ዙር:** {round_val}\n"
+                        f"🚗 **የመንጃ ፈቃድ ደረጃ:** {category_val}\n\n"
                         f"ℹ️ እባክዎ አስፈላጊ መረጃዎችን በመያዝ በመምሪያችን በአካል ቀርበው ይውሰዱ።\n"
                         f"------------------------\n"
                     )
@@ -149,8 +180,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text=text, parse_mode='Markdown')
         
     elif query.data == "send_to_channel" and not df.empty:
-        latest_round = df['round'].iloc[-1]
-        latest_data = df[df['round'] == latest_round]
+        latest_round = df['round'].iloc[-1] if 'round' in df.columns else "1ኛ"
+        latest_data = df[df['round'] == latest_round] if 'round' in df.columns else df
         
         channel_message = f"📢 **አዲስ የመንጃ ፈቃድ ማሳወቂያ ({latest_round})** 🚗\n\n"
         channel_message += f"የስልጤ ዞን ትራንስፖርትና መንገድ ልማት መምሪያ ያወጣውን የ{latest_round} የመንጃ ፈቃድ ማስታወሻ ከዚህ በታች እንገልፃለን።\n\n"
